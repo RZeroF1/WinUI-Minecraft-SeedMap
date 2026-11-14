@@ -2,7 +2,7 @@
 
 [项目首页](../README.md) · [架构说明](architecture.md) · [NuGet 与发布](nuget.md)
 
-本文面向 `0.2.2` API，保留既有公共调用方式，并新增基础地形高度 API。示例采用 `using SeedMap = RZeroF1.Minecraft.SeedMap;` 别名，所有 SDK 类型均通过 `SeedMap.` 访问，可用于启用隐式 `using` 的 .NET 10 项目。
+本文面向 `0.3.0` API，保留既有公共调用方式，新增 26.1、26.2、26.3 的独立发行入口和逐阶段能力。示例采用 `using SeedMap = RZeroF1.Minecraft.SeedMap;` 别名，所有 SDK 类型均通过 `SeedMap.` 访问，可用于启用隐式 `using` 的 .NET 10 项目。
 
 ## 世界与能力查询
 
@@ -41,7 +41,9 @@ var cancellationToken = CancellationToken.None;
 
 `VersionInfo` 表示 Native 能力表中的发行版本和整数 ID；`VersionCapability` 额外表示 `BiomeProfileKey`、`StructureProfileKey`、总体状态、群系状态、结构状态、维度状态和验证状态。发行版本可以共享群系 profile，同时保留独立结构 profile。`StructureCapability` 按实际结构分别报告 `RawPlacement`、`BiomePredicate`、`Candidates`、`GenerationPoint`、`Terrain` 和 `FullGeneration`。Mineshaft 的公开查询只返回 RNG placement，其 BiomePredicate 与 GenerationPoint 因不适用而标为 Unsupported；`FullGeneration` 对所有结构均为 Unsupported。1.18–1.21.11 的 Biome 与登记结构候选为 Supported；附加 Terrain 和 FullGeneration 仍单独报告。完整逐版清单见 [版本矩阵](versions.md)。
 
-`StructureHit.Checks` 说明本次命中实际执行的检查：`BiomePredicate` 表示执行了结构群系谓词，`ApproximateTerrain` 表示使用近似地形高度，`ExactTerrain` 表示执行了已验证的基础噪声列高度／末地城高度检查。现代 Village、Woodland Mansion、Ruined Portal 和 Trail Ruins 按实际 GenerationStub 的三维 quart 坐标筛选群系，并设置 BiomePredicate 和 ExactTerrain。返回坐标仍为既有 API 的候选区块方块原点，不是建筑中心或最终模板方块；同组 Village／Portal 子类型沿用“任一子类型生成点成立”的查询语义。Mineshaft 为 placement-only。FullGeneration 始终为 Unsupported。
+`StructureHit.Checks` 说明本次命中实际执行的检查：`BiomePredicate` 表示执行了结构群系谓词，`ApproximateTerrain` 表示使用近似地形高度，`ExactTerrain` 表示执行了已验证的基础噪声列高度／末地城高度检查。现代 Village、Woodland Mansion、Ruined Portal、Trail Ruins 和 26.3 Abandoned Camp 按实际 GenerationStub 的三维 quart 坐标筛选群系，并设置 BiomePredicate 和 ExactTerrain。返回坐标仍为候选区块方块原点；1.18–1.21.11 保留既有子类型查询规则，26.x 的 Village／主世界 Portal／Camp 使用 StructureSet 加权选择和失败重试。Mineshaft 和 26.x Nether Portal 为 placement-only；后者的 BiomePredicate、GenerationPoint 为 Unsupported。FullGeneration 始终为 Unsupported。
+
+26.1、26.2、26.3 的稳定 Native ID 分别为 149、150、151，仍使用 ABI 1 和严格 Native／managed revision 握手。群系 ID 187 为 26.2 起的 `sulfur_caves`，188 为 26.3 起的 `dappled_forest`；`Api.Biomes` 提供各版名称和颜色。26.3 的结构 ID 25 为 `abandoned_camp`，每个区域边长 592 方块；其它版本不把它列入结构目录。
 
 ## 同步群系采样
 
@@ -70,11 +72,11 @@ int[] heights = SeedMap.Api.GenerateTerrainHeights(
     cancellation: cancellationToken);
 ```
 
-这两个 WorldGen 类型精确复现默认、未混合主世界 `NoiseBasedChunkGenerator.getBaseHeight`，支持所有登记的 1.18–1.21.11 发行版。WORLD_SURFACE_WG 取最高非空气方块，包含水和熔岩；OCEAN_FLOOR_WG 取最高满足原版固体谓词的方块。返回该方块的 `Y + 1`，空列返回 `-64`。默认垂直范围为 `[-64, 320)`；例如 seed 0、1.20.6、(0,0) 的两个返回值为 63 和 56。`World.Y` 不影响高度结果。
+这两个 WorldGen 类型精确复现默认、未混合主世界 `NoiseBasedChunkGenerator.getBaseHeight`，支持所有登记的 1.18–1.21.11 发行版及 26.1、26.2、26.3。WORLD_SURFACE_WG 取最高非空气方块，包含水和熔岩；OCEAN_FLOOR_WG 取最高满足原版固体谓词的方块。返回该方块的 `Y + 1`，空列返回 `-64`。默认垂直范围为 `[-64, 320)`；例如 seed 0、1.20.6、(0,0) 的两个返回值为 63 和 56。`World.Y` 不影响高度结果。
 
 基础列包含密度插值与 Aquifer 对空气、固体、水和熔岩的判定，不执行 Surface Rules、Carvers、Features、结构地形变形、升级区块混合或实际模板方块。WorldSurface、OceanFloor、MotionBlocking、MotionBlockingNoLeaves 对应后期区块语义，当前为 Unsupported；不能把对基础列使用同名谓词的高度当作实际完成生成后的 Heightmap。旧版本、下界、末地和自定义参数同样不在此高度 API 的 Exact 范围内。
 
-`TerrainCapability` 报告 ReleaseKey、Dimension、Heightmap、Accuracy、ProfileKey、MinY 和 Height。Accuracy 的 Exact、Approximate、Experimental、Unsupported 相互区分；当前仅上述两个 WorldGen 类型在现代主世界为 Exact，不以 Cubiomes `mapApproxHeight` 替代。`ProfileKey` 区分 1.18/1.18.1、1.18.2、1.19–1.21.8 和 1.21.9–1.21.11。
+`TerrainCapability` 报告 ReleaseKey、Dimension、Heightmap、Accuracy、ProfileKey、MinY 和 Height。Accuracy 的 Exact、Approximate、Experimental、Unsupported 相互区分；当前仅上述两个 WorldGen 类型在现代主世界为 Exact，不以 Cubiomes `mapApproxHeight` 替代。`ProfileKey` 区分四个既有高度档位，以及 `terrain-26.1`、`terrain-26.2`、`terrain-26.3`。版本切换不共享缓存，三版的新高度和结构查询均不读写 generator 的有序群系搜索状态。
 
 区域结果按 `row * width + column` 排列。`step` 为 `1..30_000_000` 的整数方块间距，原点无需对齐；所有采样点须在世界边界内。每边最多 4096 点、总计最多 1,048,576 点，返回数组由调用方持有。托管层每最多 64 点检查取消，Native 不保留输出缓冲区。同一 generator 必须由一个任务独占，多个 generator 可以并行使用；噪声与有限缓存按 Seed、Profile、维度隔离，释放 generator 一并释放。高度与结构调用不改变 `SampleBiome` 的有序状态。
 

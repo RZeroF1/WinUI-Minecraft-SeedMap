@@ -271,6 +271,8 @@ const char *biome2str(int mc, int id)
     case cherry_grove: return "cherry_grove";
     // 1.21.4 (Winter Drop)
     case pale_garden: return "pale_garden";
+    case sulfur_caves: return "sulfur_caves";
+    case dappled_forest: return "dappled_forest";
     }
     return NULL;
 }
@@ -297,6 +299,7 @@ const char* struct2str(int stype)
     case Geode:             return "amethyst_geode";
     case Ancient_City:      return "ancient_city";
     case Trail_Ruins:       return "trail_ruins";
+    case Abandoned_Camp:    return "abandoned_camp";
     case Trial_Chambers:    return "trial_chambers";
     case Fortress:          return "fortress";
     case Bastion:           return "bastion_remnant";
@@ -417,6 +420,8 @@ void initBiomeColors(unsigned char colors[256][3])
     setColor(colors, mangrove_swamp,                   0x2ccc8e); // -
     setColor(colors, cherry_grove,                     0xff91c8); // -
     setColor(colors, pale_garden,                      0x696d95); // -
+    setColor(colors, sulfur_caves,                     0xc8d232); // -
+    setColor(colors, dappled_forest,                   0xc59445); // -
 }
 
 void initBiomeTypeColors(unsigned char colors[256][3])

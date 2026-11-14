@@ -1,8 +1,31 @@
 # Minecraft Java 发行版本与验证状态
 
-当前公开源码目录包含 86 个发行版本条目：1.13.2–1.21.11 的 43 个发行版和 1.4.2–1.12.2 的 43 个发行版。1.2.5、1.3.1、1.3.2 仍保留精确 Native ID、研究资料和本地回归入口，但暂不出现在 `Api.Versions` 与公开能力目录。1.2.5–1.12.2 的 46 个发行版都使用各自官方 SHA-1 校验客户端完成了独立原版 Java Oracle 对照；消费端运行 SDK 无需 Java 或游戏 JAR。
+当前公开源码目录包含 89 个发行版本条目：1.13.2–1.21.11 的 43 个发行版、1.4.2–1.12.2 的 43 个发行版和 26.1、26.2、26.3。1.2.5、1.3.1、1.3.2 仍保留精确 Native ID、研究资料和本地回归入口，但暂不出现在 `Api.Versions` 与公开能力目录。各发行版分别使用精确原版 JAR 验证；消费端运行 SDK 无需 Java 或游戏 JAR。
 
 `Supported` 针对对应能力与 DEFAULT 世界参数；结构能力按 RawPlacement、BiomePredicate、Candidates、GenerationPoint、Terrain 和 FullGeneration 阶段分别记录。`Experimental` 表示精确 JAR 对照已发现阶段限制，或该阶段尚无生产等价实现。`Api.Biomes` 是 DEFAULT 可生成群系目录，省略原版注册表中未用于该世界类型的条目。原版完整地形、结构方块落地、升级世界和自定义生成参数不由候选等级覆盖。`StructureHit.Checks` 只报告本次 Native 查询实际执行的阶段检查，未设置的标志不代表该阶段已验证。1.2.5、1.3.1、1.3.2 的强要塞在独立种子基准通过，任意 IntCache 历史状态仍标为 `Experimental`。
+
+## 26.1–26.3
+
+| 发行版本 | 稳定 Native ID | Biome Profile | 群系／三维度 | 结构候选／Stronghold | 主世界两种 WorldGen 高度 |
+| --- | ---: | --- | --- | --- | --- |
+| 26.1 | 149 | cubiomes-26.1 | Supported | Supported | Exact：terrain-26.1 |
+| 26.2 | 150 | cubiomes-26.2 | Supported，新增 sulfur_caves（187） | Supported | Exact：terrain-26.2 |
+| 26.3 | 151 | cubiomes-26.3-rtree19 | Supported，新增 dappled_forest（188） | Supported，新增 Abandoned Camp（25） | Exact：terrain-26.3 |
+
+三个版本分别完成生产 DLL 对照：每版 36,000 个三维度 quart／block 新样本和 18,432 个历史样本；两种 WorldGen 高度各 3,760 个结果及 3,760 个完整基础列；RawPlacement、128 Stronghold 和 Mineshaft 使用各版原版输入单独回放。26.3 保留原版 8,018 个节点、7,594 个叶节点和最多 19 子节点的 RTree，搜索顺序与严格距离比较共同决定 tie，不能由参数 bounds 或六阶重排表替代。
+
+26.x 的 Structure Profile 为 `java-<发行版>-structure-sets`。Village 和主世界 Ruined Portal 按原版 StructureSet 顺序和权重抽取，失败后移除该项并继续；每个变体重新建立自身的 generation RNG。26.3 的零 air-pocket 概率跳过随机调用。查询结果仍为候选区块的方块坐标。26.3 Camp 的 18 个 variants、十种等权起始帐篷、旋转、Java 负数中心取整、Jigsaw 高度投影和 biome predicate 均纳入生产路径；54 个原有有效点及负例、18 个覆盖全部 variants 的新增有效区域和最终加权选择已分别对照。
+
+| 26.x 结构阶段 | RawPlacement | BiomePredicate | Candidates | GenerationPoint | Terrain | FullGeneration |
+| --- | --- | --- | --- | --- | --- | --- |
+| Village／主世界 Ruined Portal | Supported | Supported | Supported | Supported | Supported | Unsupported |
+| Abandoned Camp（仅 26.3） | Supported | Supported | Supported | Supported | Supported：起点投影 | Unsupported |
+| Mansion／Trail Ruins | Supported | Supported | Supported | Supported | Supported | Unsupported |
+| Desert Pyramid／Jungle Temple | Supported | Supported | Supported | Supported | Experimental：附加近似筛选 | Unsupported |
+| Mineshaft | Supported | Unsupported | Supported：placement-only | Unsupported | Unsupported | Unsupported |
+| Nether Ruined Portal | Supported | Unsupported | Supported：placement-only | Unsupported | Unsupported | Unsupported |
+
+26.x 的其它结构按 `StructureCapabilities` 中具体阶段读取。三版 Exact 均限定默认、未混合主世界的 `WORLD_SURFACE_WG` 和 `OCEAN_FLOOR_WG`，垂直范围 `[-64,320)`。26.1／26.2 分别保存密度计算图；26.2 的乘法和插值位置变化、26.3 的 float Perlin／NoiseStack、体积插值、Aquifer exclusion 与单列查询范围均保留版本边界。26.3 另以 28,416 个最终密度值和六组各 444 个标量值完成 float 位模式对照。Nether／End 的完整高度 API、后期 Heightmap 和完整方块世界保持 Unsupported。
 
 ## 1.13.2–1.21.11
 
@@ -146,4 +169,4 @@ foreach (var structure in capability.StructureCapabilities)
     Console.WriteLine($"{structure.Key}: candidate={structure.Candidates}, full={structure.FullGeneration}");
 ```
 
-范围外的正式 1.0.0／1.1.0、26.x、Bedrock、自定义世界参数和混合版本存档没有在本轮新增。原版资源、映射和研究工具保留为内部验证材料，不随源码包或 NuGet 分发。
+范围外的正式 1.0.0／1.1.0、Bedrock、自定义世界参数和混合版本存档没有在本轮新增。原版资源、映射和研究工具保留为内部验证材料，不随源码包或 NuGet 分发。

@@ -60,7 +60,7 @@ public static partial class Api
     private const string Library = "rzero_seedmap";
     public const int WorldLimit = 30_000_000;
     public const int AbiVersion = 1;
-    public const string Revision = "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1";
+    public const string Revision = "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1+java26.1";
     private static readonly Lazy<VersionInfo[]> NativeCapabilities = new(InitializeNative);
     private static readonly Lazy<VersionInfo[]> Capabilities = new(InitializeReleaseCatalog);
     private static readonly Lazy<VersionCapability[]> VersionCapabilityTable = new(InitializeVersionCapabilities);
@@ -84,6 +84,7 @@ public static partial class Api
             ["1.21.4"] = "1.21.4", ["1.21.5"] = "1.21.5-1.21.8-strongholds", ["1.21.6"] = "1.21.5-1.21.8-strongholds",
             ["1.21.7"] = "1.21.5-1.21.8-strongholds", ["1.21.8"] = "1.21.5-1.21.8-strongholds", ["1.21.9"] = "1.21.5",
             ["1.21.10"] = "1.21.5", ["1.21.11"] = "1.21.11",
+            ["26.1"] = "26.1", ["26.2"] = "26.2", ["26.3"] = "26.3",
         };
 
     [StructLayout(LayoutKind.Sequential)]
@@ -287,6 +288,7 @@ public static partial class Api
         "trail_ruins" => "古迹废墟",
         "trial_chambers" => "试炼密室",
         "stronghold" => "要塞",
+        "abandoned_camp" => "废弃营地",
         _ => key.Replace('_', ' ')
     };
 
@@ -298,6 +300,8 @@ public static partial class Api
         "mountains" => "山地",
         "mountain_edge" => "山地边缘",
         "forest" => "森林",
+        "sulfur_caves" => "硫磺洞穴",
+        "dappled_forest" => "斑驳森林",
         "flower_forest" => "繁花森林",
         "birch_forest" => "桦木森林",
         "dark_forest" => "黑森林",

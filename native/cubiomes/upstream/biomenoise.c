@@ -6,6 +6,7 @@
 #include "tables/btree20.h"
 #include "tables/btree21wd.h"
 #include "tables/btree215.h"
+#include "tables/btree262.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -515,7 +516,7 @@ int mapEndBiome(const EndNoise *en, int *out, int x, int z, int w, int h)
             {
                 hx = 2*hx + 1;
                 hz = 2*hz + 1;
-                if (en->mc > MC_1_13)
+                if (en->mc > MC_1_13 && en->mc < MC_26_3)
                 {   // add outer end rings
                     rsq = hx * hx + hz * hz;
                     if ((int)rsq < 0)
@@ -898,7 +899,7 @@ int genEndScaled(const EndNoise *en, int *out, Range r, int mc, uint64_t sha)
                     out[j*r.sx+i] = the_end;
                     continue;
                 }
-                else if (mc > MC_1_13 && (int)(rsq) < 0)
+                else if (mc > MC_1_13 && mc < MC_26_3 && (int)(rsq) < 0)
                 {
                     out[j*r.sx+i] = end_barrens;
                     continue;
@@ -1525,9 +1526,12 @@ int get_resulting_node(const uint64_t np[6], const BiomeTree *bt, int idx,
     return leaf;
 }
 
+#include "tables/btree263.h"
+
 ATTR(hot, flatten)
 int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
 {
+    if(mc>=MC_26_3) return btree263_biome(np,dat);
     static const BiomeTree btree18 = {
         btree18_steps, &btree18_param[0][0], btree18_nodes, btree18_order,
         sizeof(btree18_nodes) / sizeof(uint64_t)
@@ -1552,6 +1556,10 @@ int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
         btree215_steps, &btree215_param[0][0], btree215_nodes, btree215_order,
         sizeof(btree215_nodes) / sizeof(uint64_t)
     };
+    static const BiomeTree btree262 = {
+        btree262_steps, &btree262_param[0][0], btree262_nodes, btree262_order,
+        sizeof(btree262_nodes) / sizeof(uint64_t)
+    };
 
     const BiomeTree *bt;
     int idx;
@@ -1559,7 +1567,9 @@ int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
     // THAT IS A LECTURE:
     // When you patch a newer version, do not forget to put an 'else'
     // here after you add the new biome tree.
-    if (mc >= MC_1_21_5)
+    if (mc >= MC_26_2)
+        bt = &btree262;
+    else if (mc >= MC_1_21_5)
         bt = &btree215;
     else if (mc >= MC_1_21_WD)
         bt = &btree21wd;

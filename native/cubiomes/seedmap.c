@@ -59,6 +59,7 @@ static const cm_version versions[] = {
     {146,7,"1.21.5-1.21.8-strongholds"},
     {147,7,"1.14"},
     {148,7,"1.18"},
+    {149,7,"26.1"}, {150,7,"26.2"}, {151,7,"26.3"},
     {MC_1_21_5,7,"1.21.5"}, {MC_1_21_11,7,"1.21.11"}, {MC_1_21_WD,7,"1.21.4"},
     {MC_1_21_3,7,"1.21.3"}, {MC_1_21_1,7,"1.21.1"},
     {MC_1_20_6,7,"1.20.6"}, {MC_1_19_4,7,"1.19.4"},
@@ -70,6 +71,9 @@ static const cm_version versions[] = {
 /* Stable ABI release IDs are independent of Cubiomes enum values. */
 static const int legacy_profiles[] = { MC_1_2, MC_1_3, MC_1_3, MC_1_4, MC_1_4, MC_1_4, MC_1_4, MC_1_4, MC_1_5, MC_1_5, MC_1_6, MC_1_6, MC_1_6, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_7, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_8, MC_1_9, MC_1_9, MC_1_9, MC_1_9, MC_1_9, MC_1_10, MC_1_10, MC_1_10, MC_1_11, MC_1_11, MC_1_11, MC_1_12, MC_1_12, MC_1_12 };
 static int profile_version(int id) {
+    if (id == 149) return MC_26_1;
+    if (id == 150) return MC_26_2;
+    if (id == 151) return MC_26_3;
     if (id == 146) return MC_1_21_5;
     if (id == 147) return MC_1_14;
     if (id == 148) return MC_1_18;
@@ -109,7 +113,7 @@ static int valid_type(int type) {
     case Village: case Ocean_Ruin: case Shipwreck: case Monument: case Mansion:
     case Outpost: case Ruined_Portal: case Ruined_Portal_N: case Ancient_City:
     case Treasure: case Mineshaft: case Fortress: case Bastion: case End_City:
-    case Trail_Ruins: case Trial_Chambers: return 1;
+    case Trail_Ruins: case Trial_Chambers: case Abandoned_Camp: return 1;
     default: return 0;
     }
 }
@@ -117,7 +121,7 @@ static int64_t floor_div(int64_t a, int b) {
     int64_t q=a/b, r=a%b; return q-(r<0);
 }
 int cm_abi_version(void) { return 1; }
-const char *cm_source_revision(void) { return "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1"; }
+const char *cm_source_revision(void) { return "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1+java26.1"; }
 int cm_versions(cm_version *out, int capacity) {
     int n=(int)(sizeof(versions)/sizeof(*versions));
     if (!out) return n;
@@ -174,7 +178,10 @@ int cm_create(int mc,uint64_t seed,int dim,void **out) {
     if (!owner)
         return CM_MEMORY;
     Generator *g = &owner->generator;
-    owner->terrain_profile = mc == 148         ? TERRAIN_118
+    owner->terrain_profile = mc == 149 ? TERRAIN_261
+                             : mc == 150 ? TERRAIN_262
+                             : mc == 151 ? TERRAIN_263
+                             : mc == 148         ? TERRAIN_118
                              : mc == MC_1_18_2 ? TERRAIN_1182
                              : mc == MC_1_21_5 ? TERRAIN_1219
                                                : TERRAIN_119;
@@ -227,6 +234,21 @@ static int check_biome_range(int64_t x, int64_t z, int w, int h, int step, int y
     if(x%step || z%step || x < -30000000 || z < -30000000 || x>=30000000 || z>=30000000 ||
        x+(int64_t)(w-1)*step>=30000000 || z+(int64_t)(h-1)*step>=30000000 || y < -64 || y>320)
         return CM_RANGE;
+    return CM_OK;
+}
+int cm_terrain_column(void *handle, int x, int z, int32_t *out, int capacity)
+{
+    SeedMapHandle *owner = (SeedMapHandle *)handle;
+    if (!owner || !out)
+        return CM_INVALID;
+    if (capacity < 384)
+        return CM_CAPACITY;
+    if (x < -30000000 || z < -30000000 || x >= 30000000 || z >= 30000000)
+        return CM_RANGE;
+    int rc = ensure_terrain(owner);
+    if (rc < 0)
+        return rc;
+    terrain_column_range(owner->terrain, x, z, -64, 319, out);
     return CM_OK;
 }
 int cm_biomes(void *handle,int64_t x,int64_t z,int w,int h,int step,int y,int32_t *out,int capacity) {
@@ -324,7 +346,8 @@ static int modern_generation_point(SeedMapHandle *owner, int type, int x, int z)
     }
     return CM_UNSUPPORTED;
 }
-static int portal_generation_point(SeedMapHandle *owner, int x, int z)
+static int portal_variant_point(SeedMapHandle *owner, int x, int z, int requested_kind,
+                                cm_generation_point *out)
 {
     /* Default ruined_portal template dimensions, in numbered then giant order.
      * The six rows are the standard/desert/jungle/swamp/mountain/ocean setups.
@@ -343,21 +366,26 @@ static int portal_generation_point(SeedMapHandle *owner, int x, int z)
     if (rc < 0)
         return rc;
     int ox = (x >> 4) * 16, oz = (z >> 4) * 16;
-    for (int kind = 0; kind < 6; kind++)
+    for (int kind = requested_kind; kind <= requested_kind; kind++)
     {
         uint64_t rng = chunkGenerateRnd(g->seed, x >> 4, z >> 4);
+        int air = 0;
         int placement = 0; /* 0=surface,1=underground,2=mountain,3=buried,4=ocean floor */
         if (kind == 0 || kind == 4)
         {
             int below = nextFloat(&rng) < 0.5f;
             placement = below ? (kind == 0 ? 1 : 2) : 0;
-            if (!below)
-                nextFloat(&rng); /* air-pocket sampling is skipped at probability 1. */
+            air = below;
+            if (!below && g->mc < MC_26_3)
+                air = nextFloat(&rng) < 0.5f; /* air-pocket sampling is skipped at probability 1. */
         }
         else if (kind == 1)
             placement = 3;
         else if (kind == 2)
-            nextFloat(&rng);
+        {
+            if (g->mc < MC_26_3)
+                air = nextFloat(&rng) < 0.5f;
+        }
         else
             placement = 4;
         int giant = nextFloat(&rng) < 0.05f;
@@ -445,11 +473,135 @@ static int portal_generation_point(SeedMapHandle *owner, int x, int z)
                 break;
         }
         int biome = getBiomeAt(g, 4, ox >> 2, y >> 2, oz >> 2);
-        if (biome >= 0 && biome < 256 && (masks[kind][biome >> 6] & (1ULL << (biome & 63))))
+        if (out)
+            *out = (cm_generation_point){ox,y,oz,biome,kind,template,rotation,mirror,placement,air};
+        int standard = kind == 0 &&
+            ((biome == sulfur_caves && g->mc >= MC_26_2) ||
+             (biome == dappled_forest && g->mc >= MC_26_3));
+        if (biome >= 0 && biome < 256 &&
+            (standard || (masks[kind][biome >> 6] & (1ULL << (biome & 63)))))
             return 1;
     }
     return 0;
 }
+
+static int portal_generation_point(SeedMapHandle *owner, int x, int z)
+{
+    for (int kind = 0; kind < 6; kind++)
+    {
+        int rc = portal_variant_point(owner, x, z, kind, NULL);
+        if (rc != 0)
+            return rc;
+    }
+    return 0;
+}
+static int structure_set_generation_point(SeedMapHandle *owner, int type, int x, int z,
+                                          cm_generation_point *out);
+
+int cm_structure_variant(void *handle, int type, int x, int z, int variant,
+                         cm_generation_point *out)
+{
+    SeedMapHandle *owner = (SeedMapHandle *)handle;
+    if (!owner || !out)
+        return CM_INVALID;
+    Generator *g = &owner->generator;
+    if (g->mc < MC_26_1 || g->dim != DIM_OVERWORLD)
+        return CM_UNSUPPORTED;
+    if (x < -30000000 || z < -30000000 || x >= 30000000 || z >= 30000000)
+        return CM_RANGE;
+    int count = type == Village ? 5 : type == Ruined_Portal ? 6 :
+                type == Abandoned_Camp && g->mc >= MC_26_3 ? 18 : 0;
+    if (!count)
+        return CM_UNSUPPORTED;
+    if (variant < -1 || variant >= count)
+        return CM_INVALID;
+    int rc = ensure_terrain(owner);
+    if (rc < 0)
+        return rc;
+    if (variant == -1)
+        return structure_set_generation_point(owner, type, x, z, out);
+    if (type == Ruined_Portal)
+        return portal_variant_point(owner, x, z, variant, out);
+    int px, pz, expected, start, rotation;
+    if (type == Village)
+    {
+        /* StructureSet order, not biome-ID order. Each attempt owns its RNG. */
+        static const int biomes[] = {plains,desert,savanna,snowy_tundra,taiga};
+        StructureVariant sv;
+        expected = biomes[variant];
+        if (!getVariant(&sv, Village, g->mc, g->seed, x, z, expected))
+            return CM_GENERATION;
+        px = (((x >> 4) * 32 + 2 * sv.x + sv.sx - 1) / 2);
+        pz = (((z >> 4) * 32 + 2 * sv.z + sv.sz - 1) / 2);
+        start = sv.start;
+        rotation = sv.rotation;
+    }
+    else
+    {
+        /* Java 26.3 abandoned_camp set and all 18 start pools. Each pool has
+         * ten equally weighted tents; templates 3/8 are 6x8, others 8x8.
+         * No named starting jigsaw; rigid projection and zero dimension
+         * padding. GroundLevelDelta affects piece Y, not GenerationStub Y. */
+        static const int biomes[] = {
+            bamboo_jungle,birch_forest,cherry_grove,dappled_forest,flower_forest,
+            forest,meadow,giant_tree_taiga,tall_birch_forest,giant_spruce_taiga,
+            pale_garden,savanna,snowy_taiga,jungle_edge,swamp,taiga,
+            wooded_mountains,wooded_badlands_plateau
+        };
+        expected = biomes[variant];
+        uint64_t rng = chunkGenerateRnd(g->seed, x >> 4, z >> 4);
+        rotation = nextInt(&rng, 4);
+        start = nextInt(&rng, 10);
+        int sx = start == 2 || start == 7 ? 6 : 8, sz = 8;
+        int dx = 0, dz = 0;
+        switch (rotation)
+        {
+        case 1: dx = 1 - sz; { int tmp = sx; sx = sz; sz = tmp; } break;
+        case 2: dx = 1 - sx; dz = 1 - sz; break;
+        case 3: dz = 1 - sx; { int tmp = sx; sx = sz; sz = tmp; } break;
+        }
+        /* Match Java truncation toward zero on negative odd sums. */
+        px = (((x >> 4) * 32 + 2 * dx + sx - 1) / 2);
+        pz = (((z >> 4) * 32 + 2 * dz + sz - 1) / 2);
+    }
+    int y = terrain_height(owner->terrain, px, pz, 0);
+    int biome = getBiomeAt(g, 4, px >> 2, y >> 2, pz >> 2);
+    *out = (cm_generation_point){px,y,pz,biome,variant,start,rotation,0,0,0};
+    return biome == expected || (type == Village && expected == plains && biome == meadow);
+}
+
+static int structure_set_generation_point(SeedMapHandle *owner, int type, int x, int z,
+                                          cm_generation_point *out)
+{
+    /* Registered 26.x sets have equal unit weights. Draw without replacement
+     * and stop at the first valid attempt, exactly as ChunkGenerator does.
+     * The shared Portal set contains the Nether entry, which cannot satisfy
+     * an Overworld biome predicate but must still consume the selection draw. */
+    int count = type == Village ? 5 : type == Ruined_Portal ? 7 : 18;
+    int active[18], remaining = count;
+    for (int i = 0; i < count; i++)
+        active[i] = 1;
+    uint64_t rng = chunkGenerateRnd(owner->generator.seed, x >> 4, z >> 4);
+    while (remaining)
+    {
+        int draw = nextInt(&rng, remaining), selected = 0;
+        for (; selected < count; selected++)
+            if (active[selected] && draw-- == 0)
+                break;
+        active[selected] = 0;
+        remaining--;
+        if (type == Ruined_Portal && selected == 6)
+            continue;
+        cm_generation_point point;
+        int rc = cm_structure_variant(owner, type, x, z, selected, &point);
+        if (rc > 0 && out)
+            *out = point;
+        if (rc != 0)
+            return rc;
+    }
+    return 0;
+}
+
 int cm_structure_region(void *handle, int type, int rx, int rz, cm_hit *out)
 {
     Generator *g = (Generator *)handle;
@@ -486,10 +638,18 @@ int cm_structure_region(void *handle, int type, int rx, int rz, cm_hit *out)
             pos = getFeaturePos(c, g->seed, rx, rz);
         else if (!getStructurePos(type, g->mc, g->seed, rx, rz, &pos))
             return 0;
+        /* A border-intersecting region can place its candidate outside the
+         * world. Preserve the absent-candidate result before point sampling. */
+        if (pos.x < -30000000 || pos.z < -30000000 || pos.x >= 30000000 || pos.z >= 30000000)
+            return 0;
         if (g->mc >= MC_1_18 && g->dim == DIM_OVERWORLD &&
-            (type == Mansion || type == Village || type == Trail_Ruins || type == Ruined_Portal))
+            (type == Mansion || type == Village || type == Trail_Ruins || type == Ruined_Portal ||
+             type == Abandoned_Camp))
         {
-            int rc = type == Ruined_Portal
+            int rc = g->mc >= MC_26_1 &&
+                         (type == Village || type == Ruined_Portal || type == Abandoned_Camp)
+                         ? structure_set_generation_point((SeedMapHandle *)handle, type, pos.x, pos.z, NULL)
+                         : type == Ruined_Portal
                          ? portal_generation_point((SeedMapHandle *)handle, pos.x, pos.z)
                          : modern_generation_point((SeedMapHandle *)handle, type, pos.x, pos.z);
             if (rc <= 0)

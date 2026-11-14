@@ -9,7 +9,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>true</IsPackable>
     <PackageId>RZeroF1.Minecraft.SeedMap</PackageId>
-    <PackageVersion Condition="'$(PackageVersion)' == ''">0.2.2</PackageVersion>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.3.0</PackageVersion>
     <Version Condition="'$(Version)' == ''">$(PackageVersion)</Version>
     <Authors>RZeroF1</Authors>
     <Description>面向 Minecraft Java 世界生成计算、种子地图、结构查询、精确基础地形高度与离屏渲染的通用 .NET 10 SDK。</Description>
@@ -20,7 +20,7 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/RZeroF1/Minecraft-SeedUniverse</RepositoryUrl>
     <PackageProjectUrl>https://github.com/RZeroF1/Minecraft-SeedUniverse</PackageProjectUrl>
-    <PackageReleaseNotes>新增 Minecraft Java 1.18–1.21.11 默认主世界 WORLD_SURFACE_WG/OCEAN_FLOOR_WG 精确基础高度 API、区域采样和取消；按四个版本 Profile 复现噪声、密度插值和 Aquifer。Village、Woodland Mansion、Ruined Portal、Trail Ruins 接入实际高度与三维群系谓词，保留既有候选坐标语义；后期 Heightmap 与完整方块生成不属于支持范围。保留 86 个公开发行版、历史 Native ID 和逐阶段能力矩阵。</PackageReleaseNotes>
+    <PackageReleaseNotes>新增 Minecraft Java 26.1、26.2、26.3 的独立 Native 发行身份、三维度群系及逐阶段结构能力；加入 sulfur_caves、dappled_forest 与原版 26.3 RTree 拓扑。Village/主世界 Ruined Portal 接入 StructureSet 加权重试和 26.3 Portal RNG 修正；26.3 新增 18 类 Abandoned Camp 起点查询。三版默认主世界两种 WorldGen 基础高度使用独立 Terrain Profile，26.3 保留 float 密度与体积插值语义。公开目录扩展为 89 项，保留旧版 Native ID、候选坐标及缓存契约；FullGeneration 保持 Unsupported。</PackageReleaseNotes>
     <PackageOutputPath>$(RepositoryRoot)\artifacts\packages\</PackageOutputPath>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

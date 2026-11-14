@@ -42,10 +42,12 @@ public static partial class Api
         bool supported = version.ReleaseKey.StartsWith("1.18", StringComparison.Ordinal) ||
             version.ReleaseKey.StartsWith("1.19", StringComparison.Ordinal) ||
             version.ReleaseKey.StartsWith("1.20", StringComparison.Ordinal) ||
-            version.ReleaseKey.StartsWith("1.21", StringComparison.Ordinal);
+            version.ReleaseKey.StartsWith("1.21", StringComparison.Ordinal) ||
+            version.ReleaseKey is "26.1" or "26.2" or "26.3";
         supported &= dimension == 0 && heightmap is TerrainHeightmap.WorldSurfaceWorldGen or TerrainHeightmap.OceanFloorWorldGen;
         string profile = releaseKey switch
         {
+            "26.1" or "26.2" or "26.3" => "terrain-" + releaseKey,
             "1.18" or "1.18.1" => "terrain-1.18",
             "1.18.2" => "terrain-1.18.2",
             "1.21.9" or "1.21.10" or "1.21.11" => "terrain-1.21.9",

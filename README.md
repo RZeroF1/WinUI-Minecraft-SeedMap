@@ -17,17 +17,18 @@ SDK 提供数据、计算和图像缓冲区。消费端可以使用 WinUI、WPF�
 ## 当前能力
 
 - 包 ID：`RZeroF1.Minecraft.SeedMap`
-- 当前源码版本：`0.2.2`（本地未发布修改）
+- 当前源码版本：`0.3.0`（本地未发布修改）
 - 目标框架：`.NET 10`
 - 原生运行时：Windows `win-x64`
-- Minecraft Java 公开发行版本目录：包含 `1.4.2`–`1.12.2` 的 43 个历史发行版，以及 `1.13.2`–`1.21.11` 的 43 个现代条目，共 86 项；`1.2.5`、`1.3.1`、`1.3.2` 的精确 Native ID 与回归入口保留在内部；逐版能力见 [版本矩阵](docs/versions.md)
-- 原版验证：公开目录对应的 86 个发行版，以及内部保留的 1.2.5–1.3.2 三个发行版，都有独立精确游戏 JAR Oracle 对照；1.13.2–1.17.1 的群系、维度、强要塞、矿井和已登记结构候选阶段达到 Supported，完整结构方块生成不属于支持范围
+- Minecraft Java 公开发行版本目录：包含 `1.4.2`–`1.12.2` 的 43 个历史发行版、`1.13.2`–`1.21.11` 的 43 个现代条目及 `26.1`、`26.2`、`26.3`，共 89 项；`1.2.5`、`1.3.1`、`1.3.2` 的精确 Native ID 与回归入口保留在内部；逐版能力见 [版本矩阵](docs/versions.md)
+- 原版验证：89 个公开发行版及内部保留的三个历史发行版都有独立精确游戏 JAR Oracle 对照；能力按版本、结构和阶段登记，完整结构方块生成不属于支持范围
 - 现代版本状态：1.18–1.21.11 的群系已通过每版 234,864 个有效样本的有序原版回放，27 版零差异并标为 Supported；结构仍按具体类型和验证阶段区分
-- 地形高度：1.18–1.21.11 默认主世界的 `WORLD_SURFACE_WG` 与 `OCEAN_FLOOR_WG` 提供 Exact 单点和区域查询；高度为原版 `getBaseHeight` 的首个空闲 Y，不包含雕刻、装饰和完整区块生成
+- Java 26.x：三个独立 Native ID，支持三维度群系；26.2 加入 `sulfur_caves`，26.3 加入 `dappled_forest` 并保留原版 19 阶 RTree 的搜索顺序与等距离选择；Village／主世界 Portal 使用 StructureSet 加权重试，26.3 新增 18 类 Abandoned Camp 起点查询
+- 地形高度：1.18–1.21.11 及 26.1–26.3 默认主世界的 `WORLD_SURFACE_WG` 与 `OCEAN_FLOOR_WG` 提供 Exact 单点和区域查询；26.x 各自使用独立 Profile，26.3 复现 float 密度与体积插值；高度为原版 `getBaseHeight` 的首个空闲 Y，不包含雕刻、装饰和完整区块生成
 - 现代结构：Village、Woodland Mansion、Ruined Portal、Trail Ruins 使用实际生成点高度和三维群系谓词，Candidate、GenerationPoint 与相关 Terrain 阶段为 Supported；完整结构方块生成仍为 Unsupported
 - 维度：主世界 `0`、下界 `-1`、末地 `1`
 - 采样步长：`1`、`4`、`16`、`64`、`256` 个方块
-- Cubiomes 修订版：基于 `e61f90580cbdd883214a8054670dacae655e59c0`，应用 PR #162 `ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2` 与 `legacy46.1+modern43.3+terrain27.1` 本地版本修复
+- Cubiomes 修订版：基于 `e61f90580cbdd883214a8054670dacae655e59c0`，应用 PR #162 `ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2` 与 `legacy46.1+modern43.3+terrain27.1+java26.1` 本地版本修复；选择性移植的来源见随包 Source Manifest
 
 ```text
 消费端 UI / 图像框架
@@ -45,7 +46,7 @@ rzero_seedmap.dll
 
 ## 安装
 
-在 .NET 10 项目中添加包引用，并明确使用 Windows x64：
+使用当前源码构建的本地 `0.3.0` 包时，在 .NET 10 项目中添加包引用，并明确使用 Windows x64：
 
 ```xml
 <PropertyGroup>
@@ -54,7 +55,7 @@ rzero_seedmap.dll
 </PropertyGroup>
 
 <ItemGroup>
-  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.2.2" />
+  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.3.0" />
 </ItemGroup>
 ```
 
@@ -100,7 +101,7 @@ int[] heights = SeedMap.Api.GenerateTerrainHeights(
 
 ## 支持范围
 
-当前包提供 Windows x64 原生资产，面向原版 Minecraft Java 默认世界计算。`Api.VersionCapabilities` 按结构阶段登记能力，`Api.GetTerrainCapability` 按版本、维度和 Heightmap 类型报告 Exact、Approximate、Experimental 或 Unsupported。高度引擎覆盖未混合默认主世界的基础噪声列；后期 Heightmap、26.x、自定义世界生成、Minecraft Bedrock、混合版本存档和完整方块世界生成不在当前支持范围内。
+当前包提供 Windows x64 原生资产，面向原版 Minecraft Java 默认世界计算。`Api.VersionCapabilities` 按结构阶段登记能力，`Api.GetTerrainCapability` 按版本、维度和 Heightmap 类型报告 Exact、Approximate、Experimental 或 Unsupported。高度引擎覆盖未混合默认主世界的基础噪声列；后期 Heightmap、自定义世界生成、Minecraft Bedrock、混合版本存档和完整方块世界生成不在当前支持范围内。26.x Nether Portal 仅提供 placement 候选，其 BiomePredicate 和 GenerationPoint 为 Unsupported。
 
 ## 构建与打包
 

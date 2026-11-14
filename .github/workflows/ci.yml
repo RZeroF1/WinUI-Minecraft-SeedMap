@@ -72,6 +72,20 @@ jobs:
               throw "Cubiomes SHA-256 mismatch: $file"
             }
           }
+          $nativeFiles = @(Get-ChildItem native/cubiomes -Recurse -File |
+            Where-Object { $_.Extension -in '.c', '.h' -or $_.Name -eq 'build.cmd' } |
+            ForEach-Object { [IO.Path]::GetRelativePath((Get-Location).Path, $_.FullName).Replace('\', '/') })
+          $listedFiles = @($entries | ForEach-Object { $_.Name } |
+            Where-Object { [IO.Path]::GetExtension($_) -in '.c', '.h' -or $_.EndsWith('/build.cmd') })
+          if (@(Compare-Object $nativeFiles $listedFiles).Count -ne 0) {
+            throw 'Native build inputs and Source Manifest coverage differ.'
+          }
+          $managedSource = Get-Content src/RZeroF1.Minecraft.SeedMap.Core/Api.cs -Raw
+          $nativeSource = Get-Content native/cubiomes/seedmap.c -Raw
+          if (-not $managedSource.Contains('"' + $manifest.revision + '"') -or
+              -not $nativeSource.Contains('"' + $manifest.revision + '"')) {
+            throw 'Native/managed revision differs from Source Manifest.'
+          }
           Write-Host "Verified $($entries.Count) Cubiomes source hashes and license files."
 
       - name: 构建 SDK（Release，win-x64）
@@ -165,6 +179,70 @@ jobs:
             Write-Host "已验证 $($packages[0].Name) 的版本、文档、仓库提交及 Native 与许可证资产。"
           }
           finally { $zip.Dispose() }
+
+      - name: 独立还原并加载本次 NuGet 包
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $consumer = Join-Path $env:RUNNER_TEMP 'seedmap-package-consumer'
+          New-Item -ItemType Directory -Path $consumer -Force | Out-Null
+          [xml] $sdkProject = Get-Content src/RZeroF1.Minecraft.SeedMap.Core/RZeroF1.Minecraft.SeedMap.Core.csproj -Raw
+          $packageVersion = ($sdkProject.Project.PropertyGroup.PackageVersion | Where-Object { $_ }).InnerText
+          @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net10.0</TargetFramework>
+              <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+              <ImplicitUsings>enable</ImplicitUsings>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="$packageVersion" />
+            </ItemGroup>
+          </Project>
+          "@ | Set-Content (Join-Path $consumer 'Consumer.csproj') -Encoding utf8
+          @'
+          using RZeroF1.Minecraft.SeedMap;
+          using System.Diagnostics;
+          using System.Security.Cryptography;
+          foreach (var (release, id) in new[] { ("26.1", 149), ("26.2", 150), ("26.3", 151) })
+          {
+              if (Api.GetVersionCapability(release).NativeId != id ||
+                  Api.GetTerrainCapability(release, 0, TerrainHeightmap.WorldSurfaceWorldGen).Accuracy != TerrainAccuracy.Exact)
+                  throw new Exception("Package release profile mismatch: " + release);
+              using var generator = Api.Create(new(123, id, 0, 64));
+              if (Api.Generate(generator, 0, 0, 4, 4, 4, 64).Length != 16 ||
+                  Api.GenerateTerrainHeights(generator, -1, -1, 3, 3).Length != 9)
+                  throw new Exception("Package native computation failed: " + release);
+              Api.QueryRegion(generator, 11, 0, 0);
+          }
+          var native = Process.GetCurrentProcess().Modules.Cast<ProcessModule>()
+              .Single(module => module.ModuleName.Equals("rzero_seedmap.dll", StringComparison.OrdinalIgnoreCase));
+          var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(native.FileName)));
+          if (hash != Environment.GetEnvironmentVariable("SEEDMAP_EXPECTED_NATIVE_SHA256"))
+              throw new Exception("Consumer loaded a different Native DLL.");
+          Console.WriteLine("PASS independent package restore, Java 26.x profiles and Native SHA-256 " + hash);
+          '@ | Set-Content (Join-Path $consumer 'Program.cs') -Encoding utf8
+          $localFeed = [Security.SecurityElement]::Escape((Join-Path (Get-Location).Path 'artifacts/packages'))
+          @"
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$localFeed" />
+              <add key="nuget" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="local"><package pattern="RZeroF1.Minecraft.SeedMap" /></packageSource>
+              <packageSource key="nuget"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          "@ | Set-Content (Join-Path $consumer 'NuGet.config') -Encoding utf8
+          $env:NUGET_PACKAGES = Join-Path $consumer 'packages'
+          $env:SEEDMAP_EXPECTED_NATIVE_SHA256 = (Get-FileHash src/RZeroF1.Minecraft.SeedMap.Core/bin/Release/net10.0/win-x64/rzero_seedmap.dll -Algorithm SHA256).Hash
+          dotnet restore (Join-Path $consumer 'Consumer.csproj') --configfile (Join-Path $consumer 'NuGet.config') --no-cache -nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Independent package restore failed.' }
+          dotnet run --project (Join-Path $consumer 'Consumer.csproj') -c Release -r win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Independent package consumer failed.' }
 
       - name: 归档已验证的包
         uses: actions/upload-artifact@v4

@@ -69,6 +69,15 @@ static double bounded(double n, double lo, double hi)
 {
     return n < lo ? lo : n > hi ? hi : n;
 }
+static float flerp(float f, float a, float b)
+{
+    return a + f * (b - a);
+}
+static float flerp3(float x, float y, float z, const float v[8])
+{
+    return flerp(z, flerp(y, flerp(x, v[0], v[1]), flerp(x, v[2], v[3])),
+                    flerp(y, flerp(x, v[4], v[5]), flerp(x, v[6], v[7])));
+}
 static int divfloor(int n, int d)
 {
     int q = n / d;
@@ -154,6 +163,57 @@ static double octsample(const OctaveNoise *o, double x, double y, double z)
     }
     return v;
 }
+/* 26.3 uses float Perlin gradients and noise stacks. Volume sampling factors
+ * the XZ gradient before adding Y; scalar sampling uses the XYZ dot order. */
+static float perlin263(const PerlinNoise *p, double x, double y, double z,
+                       double smear, int volume)
+{
+    double originalY = y;
+    x = wrap(x) + p->a;
+    y = wrap(y) + p->b;
+    z = wrap(z) + p->c;
+    int ix = (int)floor(x), iy = (int)floor(y), iz = (int)floor(z);
+    float fx = (float)(x - floor(x)), fz = (float)(z - floor(z));
+    double relativeY = y - floor(y);
+    float uy = (float)relativeY;
+    if (smear != 0)
+    {
+        double limit = originalY >= 0 && originalY < relativeY ? originalY : relativeY;
+        relativeY -= floor(limit / smear + (double)1.0e-7f) * smear;
+    }
+    float fy = (float)relativeY, values[8];
+    const uint8_t *d = p->d;
+    for (int i = 0; i < 8; i++)
+    {
+        int a = d[(ix + (i & 1)) & 255];
+        int b = d[(a + iy + ((i >> 1) & 1)) & 255];
+        const int *g = grad[d[(b + iz + ((i >> 2) & 1)) & 255] & 15];
+        float xx = fx - (i & 1), yy = fy - ((i >> 1) & 1), zz = fz - ((i >> 2) & 1);
+        values[i] = volume ? (g[0] * xx + g[2] * zz) + g[1] * yy
+                           : (g[0] * xx + g[1] * yy) + g[2] * zz;
+    }
+    float ax = fx * fx * fx * (fx * (fx * 6.0f - 15.0f) + 10.0f);
+    float ay = uy * uy * uy * (uy * (uy * 6.0f - 15.0f) + 10.0f);
+    float az = fz * fz * fz * (fz * (fz * 6.0f - 15.0f) + 10.0f);
+    return flerp3(ax, ay, az, values);
+}
+static float normal263(Terrain *t, int n, double x, double y, double z,
+                       int volume, double xzScale, double yScale)
+{
+    const DoublePerlinNoise *noise = t->noise + n;
+    float value = 0;
+    for (int i = 0; i < noise->octA.octcnt; i++)
+        for (int b = 0; b < 2; b++)
+        {
+            const PerlinNoise *p = (b ? noise->octB.octaves : noise->octA.octaves) + i;
+            double frequency = p->lacunarity * (b ? 1.0181268882175227 : 1.0);
+            double xx = volume ? x * (xzScale * frequency) : x * frequency;
+            double yy = volume ? y * (yScale * frequency) : y * frequency;
+            double zz = volume ? z * (xzScale * frequency) : z * frequency;
+            value += terrain263_noise_weights[n][i] * perlin263(p, xx, yy, zz, 0, volume);
+        }
+    return value;
+}
 static double normal(Terrain *t, int n, double x, double y, double z)
 {
     const DoublePerlinNoise *p = t->noise + n;
@@ -162,6 +222,28 @@ static double normal(Terrain *t, int n, double x, double y, double z)
 }
 static double base(Terrain *t, int x, int y, int z)
 {
+    if (t->profile == TERRAIN_263)
+    {
+        float main = 0, mn = 0, mx = 0;
+        double f = 1, xs = 684.412 * 0.25, ys = 684.412 * 0.125;
+        for (int i = 0; i < 8; i++, f /= 2)
+            main += (float)(0.05 / f) *
+                perlin263(t->blended + 32 + i, x * (xs / 80.0 * f),
+                          y * (ys / 160.0 * f), z * (xs / 80.0 * f), ys * 8.0 / 160.0 * f, 1);
+        float q = (float)bounded(main + 0.5f, 0, 1);
+        f = 1;
+        for (int i = 0; i < 16; i++, f /= 2)
+        {
+            float weight = (float)(1.0 / 65536.0 / f);
+            if (q < 1)
+                mn += weight * perlin263(t->blended + i, x * (xs * f), y * (ys * f),
+                                         z * (xs * f), ys * 8.0 * f, 1);
+            if (q > 0)
+                mx += weight * perlin263(t->blended + 16 + i, x * (xs * f), y * (ys * f),
+                                         z * (xs * f), ys * 8.0 * f, 1);
+        }
+        return q == 0 ? mn : q == 1 ? mx : flerp(q, mn, mx);
+    }
     double xx = x * (684.412 * 0.25), yy = y * (684.412 * 0.125), zz = z * (684.412 * 0.25);
     double fx = xx / 80.0, fy = yy / 160.0, fz = zz / 80.0, smear = (684.412 * 0.125) * 8.0;
     if (t->profile == TERRAIN_1182 || t->profile == TERRAIN_118)
@@ -274,10 +356,6 @@ static double earlyNoodle(Terrain *t, int id, int x, int y, int z, double scale,
     return lerp3((y - by) / 8.0, (x - bx) / 4.0, (z - bz) / 4.0, v[0], v[2], v[1], v[3], v[4], v[6],
                  v[5], v[7]);
 }
-static float flerp(float f, float a, float b)
-{
-    return a + f * (b - a);
-}
 static float spline(Terrain *t, const TerrainNode *p, int x, int y, int z, int mode)
 {
     float f = (float)eval(t, p->a[0], x, y, z, mode);
@@ -331,6 +409,29 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
     case TD_ADD:
         v = E(0) + E(1);
         break;
+    case TD_SUB:
+        v = E(0) - E(1);
+        break;
+    case TD_DIV:
+        v = E(0) / E(1);
+        break;
+    case TD_NEGATE:
+        v = -E(0);
+        break;
+    case TD_Y:
+        v = y;
+        break;
+    case TD_LERP: {
+        float alpha = (float)E(0);
+        v = alpha == 0 ? E(1) : alpha == 1 ? E(2) : flerp(alpha, (float)E(1), (float)E(2));
+        break;
+    }
+    case TD_GRADIENT26: {
+        float factor = ((float)p->p[3] - (float)p->p[2]) / (float)(p->p[1] - p->p[0]);
+        int yy = y < p->p[0] ? (int)p->p[0] : y > p->p[1] ? (int)p->p[1] : y;
+        v = (float)p->p[2] + (float)(yy - (int)p->p[0]) * factor;
+        break;
+    }
     case TD_MUL:
         a = E(0);
         v = a == 0 ? 0 : a * E(1);
@@ -354,7 +455,7 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
         break;
     case TD_CUBE:
         a = E(0);
-        v = a * a * a;
+        v = t->profile == TERRAIN_263 ? (float)((float)a * (float)a) * (float)a : a * a * a;
         break;
     case TD_HALF_NEGATIVE:
         a = E(0);
@@ -366,31 +467,48 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
         break;
     case TD_SQUEEZE:
         a = bounded(E(0), -1, 1);
-        v = a / 2.0 - a * a * a / 24.0;
+        v = t->profile == TERRAIN_263
+                ? (float)a / 2.0f - ((float)((float)a * (float)a) * (float)a) / 24.0f
+                : a / 2.0 - a * a * a / 24.0;
         break;
     case TD_CLAMP:
-        v = bounded(E(0), p->p[0], p->p[1]);
+        v = bounded(E(0), t->profile == TERRAIN_263 ? (float)p->p[0] : p->p[0],
+                         t->profile == TERRAIN_263 ? (float)p->p[1] : p->p[1]);
         break;
     case TD_RANGE_CHOICE:
         a = E(0);
-        v = a >= p->p[0] && a < p->p[1] ? E(1) : E(2);
+        v = a >= (t->profile == TERRAIN_263 ? (float)p->p[0] : p->p[0]) &&
+            a < (t->profile == TERRAIN_263 ? (float)p->p[1] : p->p[1]) ? E(1) : E(2);
         break;
     case TD_Y_CLAMPED_GRADIENT:
         v = clampedLerp(((double)y - p->p[0]) / (p->p[1] - p->p[0]), p->p[2], p->p[3]);
         break;
     case TD_NOISE:
-        v = normal(t, p->a[3], x * p->p[0], y * p->p[1], z * p->p[0]);
+        v = t->profile == TERRAIN_263
+                ? normal263(t, p->a[3], mode ? x : x * p->p[0],
+                            mode ? y : y * p->p[1], mode ? z : z * p->p[0],
+                            mode != 0, p->p[0], p->p[1])
+                : normal(t, p->a[3], x * p->p[0], y * p->p[1], z * p->p[0]);
         break;
     case TD_SHIFT_A:
-        v = normal(t, p->a[3], x * 0.25, 0, z * 0.25) * 4;
+        v = t->profile == TERRAIN_263
+                ? normal263(t, p->a[3], mode ? x : x * 0.25, 0, mode ? z : z * 0.25,
+                            mode != 0, 0.25, 0) * 4.0f
+                : normal(t, p->a[3], x * 0.25, 0, z * 0.25) * 4;
         break;
     case TD_SHIFT_B:
-        v = normal(t, p->a[3], z * 0.25, x * 0.25, 0) * 4;
+        v = t->profile == TERRAIN_263
+                ? normal263(t, p->a[3], mode ? z : z * 0.25, mode ? x : x * 0.25, 0,
+                            mode != 0, 0.25, 0.25) * 4.0f
+                : normal(t, p->a[3], z * 0.25, x * 0.25, 0) * 4;
         break;
     case TD_SHIFTED_NOISE:
         a = E(0);
         b = E(1);
-        v = normal(t, p->a[3], x * p->p[0] + a, y * p->p[1] + b, z * p->p[0] + E(2));
+        v = t->profile == TERRAIN_263
+                ? normal263(t, p->a[3], x * p->p[0] + a, y * p->p[1] + b,
+                            z * p->p[0] + E(2), 0, 1, 1)
+                : normal(t, p->a[3], x * p->p[0] + a, y * p->p[1] + b, z * p->p[0] + E(2));
         break;
     case TD_WEIRD_SCALED_SAMPLER:
         a = E(0);
@@ -438,6 +556,24 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
         break;
     }
     case TD_INTERPOLATED:
+        if (t->profile == TERRAIN_263)
+        {
+            int sx = (int)p->p[0], sy = (int)p->p[1];
+            int bx = divfloor(x, sx) * sx, by = divfloor(y, sy) * sy, bz = divfloor(z, sx) * sx;
+            float val[8];
+            for (int j = 0; j < 8; j++)
+                val[j] = (float)eval(t, p->a[0], bx + (j & 1) * sx,
+                                    by + ((j >> 1) & 1) * sy, bz + ((j >> 2) & 1) * sx, 2);
+            /* BaseColumn's sampleVolume: interpolate Z, then X, then accumulate Y. */
+            float az = (float)(z - bz) / sx, ax = (float)(x - bx) / sx;
+            float lo = flerp(ax, flerp(az, val[0], val[4]), flerp(az, val[1], val[5]));
+            float hi = flerp(ax, flerp(az, val[2], val[6]), flerp(az, val[3], val[7]));
+            float step = (hi - lo) * (1.0f / sy), value = lo;
+            for (int yy = 0; yy < y - by; yy++)
+                value += step;
+            v = value;
+            break;
+        }
         if (mode)
         {
             int bx = divfloor(x, 4) * 4, by = divfloor(y, 8) * 8, bz = divfloor(z, 4) * 4;
@@ -454,6 +590,8 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
         break;
     }
 #undef E
+    if (t->profile == TERRAIN_263)
+        v = (float)v;
     e->used = mode ? t->cacheEpoch : 1;
     e->x = x;
     e->y = y;
@@ -464,7 +602,7 @@ static double eval(Terrain *t, int n, int x, int y, int z, int mode)
 }
 Terrain *terrain_create(uint64_t seed, int profile)
 {
-    if (profile < TERRAIN_119 || profile > TERRAIN_118)
+    if (profile < TERRAIN_119 || profile > TERRAIN_263)
         return NULL;
     Terrain *t = calloc(1, sizeof(*t));
     if (!t)
@@ -509,8 +647,14 @@ static int preliminary(Terrain *t, int x, int z)
     if (e->used && e->x == x && e->z == z)
         return e->y;
     int y;
-    if (t->profile == TERRAIN_1219)
-        y = (int)eval(t, TR_PRELIMINARY_SURFACE_LEVEL, x, 0, z, 0);
+    if (t->profile == TERRAIN_1219 || t->profile >= TERRAIN_261)
+    {
+        int root = t->profile == TERRAIN_261 ? T261_PRELIMINARY_SURFACE_LEVEL
+                 : t->profile == TERRAIN_262 ? T262_PRELIMINARY_SURFACE_LEVEL
+                 : t->profile == TERRAIN_263 ? T263_SURFACE_LEVEL
+                                            : TR_PRELIMINARY_SURFACE_LEVEL;
+        y = (int)eval(t, root, x, 0, z, 0);
+    }
     else if (t->profile == TERRAIN_118)
     {
         for (y = 320; y >= -64; y -= 8)
@@ -580,8 +724,11 @@ static Fluid fluid(Terrain *t, int x, int y, int z)
             surface = s;
     }
     double d1, d2;
-    if (!t->early && eval(t, TR_EROSION, x, y, z, 0) < (double)-0.225f &&
-        eval(t, TR_DEPTH, x, y, z, 0) > (double)0.9f)
+    int depthRoot = t->profile == TERRAIN_261 ? T261_DEPTH
+                  : t->profile == TERRAIN_262 ? T262_DEPTH : TR_DEPTH;
+    if (t->profile == TERRAIN_263 ? eval(t, T263_EXCLUSION, x, y, z, 0) > 0
+        : !t->early && eval(t, TR_EROSION, x, y, z, 0) < (double)-0.225f &&
+          eval(t, depthRoot, x, y, z, 0) > (double)0.9f)
         d1 = d2 = -1;
     else
     {
@@ -597,10 +744,10 @@ static Fluid fluid(Terrain *t, int x, int y, int z)
     else if (d2 > 0)
     {
         int gx = divfloor(x, 16), gy = divfloor(y, 40), gz = divfloor(z, 16);
-        double n =
-            (t->profile == TERRAIN_118 ? normal(t, TI_AQUIFER_FLUID_LEVEL_SPREAD, gx, gy / 1.4, gz)
-                                       : eval(t, TR_FLUID_LEVEL_SPREAD, gx, gy, gz, 0)) *
-            10.0;
+        double spread = t->profile == TERRAIN_118
+                            ? normal(t, TI_AQUIFER_FLUID_LEVEL_SPREAD, gx, gy / 1.4, gz)
+                            : eval(t, TR_FLUID_LEVEL_SPREAD, gx, gy, gz, 0);
+        double n = t->profile == TERRAIN_263 ? (float)spread * 10.0f : spread * 10.0;
         int nlevel = gy * 40 + 20 + (int)floor(n / 3.0) * 3;
         randomizedLevel = nlevel;
         f.level = surface < nlevel ? surface : nlevel;
@@ -655,15 +802,24 @@ static double pressure(Terrain *t, int x, int y, int z, Fluid a, Fluid b, double
 static int aquifer_top(Terrain *t, int x, int z)
 {
     int cx = divfloor(x, 16), cz = divfloor(z, 16);
+    if (t->profile == TERRAIN_263)
+    {
+        cx = x;
+        cz = z;
+    }
     unsigned hash = ((unsigned)cx * 543217u ^ (unsigned)cz * 812521u) & 63;
     SurfaceEntry *e = t->aquiferTop + hash;
     if (e->used && e->x == cx && e->z == cz)
         return e->y;
     int top = -64;
-    for (int dz = -16; dz <= 25; dz += 4)
-        for (int dx = -16; dx <= 25; dx += 4)
+    int minX = t->profile == TERRAIN_263 ? divfloor(divfloor(x - 5, 16) * 16, 4) * 4 : cx * 16 - 16;
+    int minZ = t->profile == TERRAIN_263 ? divfloor(divfloor(z - 5, 16) * 16, 4) * 4 : cz * 16 - 16;
+    int maxX = t->profile == TERRAIN_263 ? (divfloor(x - 5, 16) + 1) * 16 + 9 : cx * 16 + 25;
+    int maxZ = t->profile == TERRAIN_263 ? (divfloor(z - 5, 16) + 1) * 16 + 9 : cz * 16 + 25;
+    for (int zz = minZ; zz <= maxZ; zz += 4)
+        for (int xx = minX; xx <= maxX; xx += 4)
         {
-            int surface = preliminary(t, cx * 16 + dx, cz * 16 + dz);
+            int surface = preliminary(t, xx, zz);
             if (surface > top)
                 top = surface;
         }
@@ -677,7 +833,7 @@ static int substance(Terrain *t, int x, int y, int z, double density)
 {
     if (density > 0)
         return 1;
-    if (t->profile == TERRAIN_1219 && y > aquifer_top(t, x, z))
+    if ((t->profile == TERRAIN_1219 || t->profile >= TERRAIN_261) && y > aquifer_top(t, x, z))
         return fluidat(global(y), y);
     if (y < -54)
         return 3;
@@ -803,8 +959,11 @@ static int scan_column(Terrain *t, int x, int z, int type, int *column, int minY
             }
         }
         else
-            density =
-                eval(t, profile == TERRAIN_1182 ? TL_FINAL_DENSITY : TR_FINAL_DENSITY, x, y, z, 1);
+            density = eval(t, profile == TERRAIN_1182 ? TL_FINAL_DENSITY
+                            : profile == TERRAIN_261 ? T261_FINAL_DENSITY
+                            : profile == TERRAIN_262 ? T262_FINAL_DENSITY
+                            : profile == TERRAIN_263 ? T263_FINAL_DENSITY
+                                                    : TR_FINAL_DENSITY, x, y, z, 1);
         int block = substance(t, x, y, z, density);
         if (column)
             column[y - minY] = block;

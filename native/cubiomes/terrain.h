@@ -14,7 +14,10 @@ enum
     TERRAIN_119 = 0, /* 1.19-1.21.8 */
     TERRAIN_1182 = 1,
     TERRAIN_1219 = 2, /* 1.21.9-1.21.11 */
-    TERRAIN_118 = 3   /* 1.18-1.18.1 */
+    TERRAIN_118 = 3,  /* 1.18-1.18.1 */
+    TERRAIN_261 = 4,
+    TERRAIN_262 = 5,
+    TERRAIN_263 = 6
 };
 typedef struct Terrain Terrain;
 Terrain *terrain_create(uint64_t seed, int profile);

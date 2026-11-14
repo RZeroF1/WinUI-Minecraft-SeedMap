@@ -1,15 +1,15 @@
 {
   "component": "Cubiomes",
-  "revision": "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1",
+  "revision": "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2+legacy46.1+modern43.3+terrain27.1+java26.1",
   "license": "MIT",
   "source": "https://github.com/Cubitect/cubiomes",
   "files": {
-    "native/cubiomes/upstream/biomenoise.c": "ffbfdc46bf0464e0de0d620ce5eafcd2c429b107c6e085f3b5680401a9a7153f",
+    "native/cubiomes/upstream/biomenoise.c": "d3ca8476906da13c2e3226f7285ce67818646b1062fbf627cbf9b7cda74b3a46",
     "native/cubiomes/upstream/biomenoise.h": "8908ebe95413a2aba2584931ababc4a4439df437562135972f8e7296e93c95e2",
-    "native/cubiomes/upstream/biomes.c": "19cd5e45376505fb4ef1ccdc3b10f06c4c8d38de6886d7bd535715a9464e9e0c",
-    "native/cubiomes/upstream/biomes.h": "9034c72cb79e39a6d60e1de255b0fadd451959504fc8dfe105d664e1597b22f6",
-    "native/cubiomes/upstream/finders.c": "f9017d914472bb38ee06d863a626bcc66f3bb56a9c03c38e1e95a305f1633d24",
-    "native/cubiomes/upstream/finders.h": "89bde20ae193459c87567b6e9b3742de87620bfaed574e5f5c9e1b4919eed67c",
+    "native/cubiomes/upstream/biomes.c": "6c6fe4942b4d9184b653c533be713e8a4cc7507d0f64180d45920375f6a09e6d",
+    "native/cubiomes/upstream/biomes.h": "200b41d12e40f0cd1613d874d5615230e43870449986bfbfd48dc5c851f7de14",
+    "native/cubiomes/upstream/finders.c": "cbca717dfa1fcc0d0d272f13f9d2d7e1cfad33b73ab47be97631513d40149130",
+    "native/cubiomes/upstream/finders.h": "590af7744cc03041b5b936b0575c4e07418d42bccc9e5ebffed607aebd15036a",
     "native/cubiomes/upstream/generator.c": "76ebdd1f51a654e0575c04d27b9b6c4d6d265985a2895c48fed1f1a53f07c05f",
     "native/cubiomes/upstream/generator.h": "2e3f91ba6f0685be83e144600dd7a563123be7acbbd7b7ea8e715be5cd45961e",
     "native/cubiomes/upstream/layers.c": "d145bce593b4a9aa96d99912720c33ae51303b23861e87091e5fd031a3661f78",
@@ -25,16 +25,32 @@
     "native/cubiomes/upstream/tables/btree20.h": "8efd25b3165f457d30f9f7fe41f565cba842aa8513038a7e5ed273e481f2aa3b",
     "native/cubiomes/upstream/tables/btree215.h": "e08130964e66142c10f8e5e27e7a18b363a98720d464a04ecab8f1768aa1de16",
     "native/cubiomes/upstream/tables/btree21wd.h": "ce8cc83f9be7e2bd6e61589bfb5c401451ac01c49032f51949ad7de0cfb303d9",
-    "native/cubiomes/upstream/util.c": "40885a2407e3253595f5a84ba30d9223d284188c759278f014dd03f823638ae1",
+    "native/cubiomes/upstream/util.c": "c17fe0fb52e7b4b53033ab70ce939df3d5e5d468a1cc55ec41a73eef22efbdf3",
     "native/cubiomes/upstream/util.h": "086fb1d99ac9da860be98ad5239acb7bf4f326a0c30b554710909c36d4b3e154",
     "native/cubiomes/build.cmd": "d31349646a63bf35f8fbdb66d538f331548c8ae8d82a79b575ada8a5f77f240a",
-    "native/cubiomes/seedmap.c": "5ffd68fba05ddb2d98c780002a81f7a224daeffc4b7f614ef581417d025d1d6c",
-    "native/cubiomes/seedmap.h": "84954d686064136bb1c56b5787ad086669939508fc5f8909462522cda7cc53fb",
-    "native/cubiomes/terrain.c": "17bbe7dcc2649d7fe6f67646c014e7537bd35185fd8fd737f9c2a3af59c2fd60",
-    "native/cubiomes/terrain.h": "d8571d318531e3fd5bc121e777821bbd7a1d11e59e2e9d240e36556fca0fdbe9",
-    "native/cubiomes/terrain_tables.h": "dd26d0bb2845d17b05090aa2622d044b9a236d21439f55455b566c3be1ad7673"
+    "native/cubiomes/seedmap.c": "b5fa9eaa3f530997d92bf59ebef4db41edbc66c9ee734306ae4274734be7e944",
+    "native/cubiomes/seedmap.h": "70e0fa1b5c3b45618baf48ff979de14e4a1033f195308a7d06df7ffe0c33d034",
+    "native/cubiomes/terrain.c": "cca42fc1a5294f17940bb82cfaa801fccb9ea01141e90d27248c3218c15bf9a3",
+    "native/cubiomes/terrain.h": "f5080b425e5fdba05d88a18242443685a494a9ee32d5ce71d8b848c34366e959",
+    "native/cubiomes/terrain_tables.h": "c0e0febdc324e96ee829f4788c1f5b7f4f9381b61b6ca66965f8ea991e58e617",
+    "native/cubiomes/upstream/tables/btree262.h": "31cbb201c7df9e7b4136403d181c32d97d7d9afd7555558117cbc941438b94f4",
+    "native/cubiomes/upstream/tables/btree263.h": "42c872e977f8e120147d43ff09ea9f7b2fd8d987a53313490fbdec1007d7a3c7"
   },
   "base_revision": "ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2",
-  "local_changes": "Exact Java 1.2.5-1.12.2 release profiles, vanilla structure predicates, legacy End semantics, and modern 1.13.2-1.21.11 release adaptations; Ordered climate ties and exact 1.18+ structure profile/candidate refinements. Exact default Overworld base-height profiles for Java 1.18-1.21.11 and height-aware modern structure generation-point predicates.",
-  "project_file_license": "MPL-2.0 for native/cubiomes/{seedmap.c,seedmap.h,terrain.c,terrain.h,terrain_tables.h,build.cmd}; upstream/ retains MIT."
+  "local_changes": "Exact legacy46/modern43 release profiles and Terrain27.1 retained; independent Java 26.1-26.3 release IDs, ordered climate topology, weighted structure retry, Portal RNG and Abandoned Camp start predicates. Independent 26.x default Overworld density profiles, including 26.3 float noise, volume interpolation and aquifer semantics.",
+  "project_file_license": "MPL-2.0 for native/cubiomes/{seedmap.c,seedmap.h,terrain.c,terrain.h,terrain_tables.h,build.cmd}; upstream/ retains MIT.",
+  "additional_sources": [
+    {
+      "source": "https://github.com/Cubitect/cubiomes/pull/166",
+      "revision": "53b86c8bee85806347d3051b2f43d7ca206f7aba",
+      "license": "MIT",
+      "scope": "26.2 biome table and biome/range changes"
+    },
+    {
+      "source": "https://github.com/xpple/cubiomes",
+      "revision": "8c37ab26f2b47740839eb0045b34efc5141eb065",
+      "license": "MIT",
+      "scope": "Reviewed 26.3 biome identity/range and End-ring version rules; six-order 26.3 tree excluded"
+    }
+  ]
 }

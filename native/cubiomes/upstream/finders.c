@@ -85,6 +85,7 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     s_ancient_city          = { 20083232, 24, 16, Ancient_City,     0,0},
     s_trail_ruins           = { 83469867, 34, 26, Trail_Ruins,      0,0},
     s_trial_chambers        = { 94251327, 34, 22, Trial_Chambers,   0,0},
+    s_abandoned_camp        = { 91231127, 37, 29, Abandoned_Camp,   0,0},
     s_treasure              = { 10387320,  1,  1, Treasure,         0,0},
     s_mineshaft             = {        0,  1,  1, Mineshaft,        0,0},
     s_desert_well_115       = {    30010,  1,  1, Desert_Well,      0, 1.f/1000},
@@ -193,6 +194,9 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     case Trial_Chambers:
         *sconf = s_trial_chambers;
         return mc >= MC_1_21_1;
+    case Abandoned_Camp:
+        *sconf = s_abandoned_camp;
+        return mc >= MC_26_3;
     default:
         memset(sconf, 0, sizeof(StructureConfig));
         return 0;
@@ -236,6 +240,7 @@ int getStructurePos(int structureType, int mc, uint64_t seed, int regX, int regZ
     case Ancient_City:
     case Trail_Ruins:
     case Trial_Chambers:
+    case Abandoned_Camp:
         *pos = getFeaturePos(sconf, seed, regX, regZ);
         return 1;
 
@@ -825,6 +830,9 @@ int isStrongholdBiome(int mc, int id)
     case bamboo_jungle_hills:
         // simulate MC-199298
         return mc <= MC_1_15 || mc >= MC_1_18;
+    case dappled_forest:
+        // Exact 26.3 stronghold_biased_to deliberately omits this biome.
+        return 0;
     case mangrove_swamp:
     case deep_dark:
         return 0;
@@ -5568,6 +5576,14 @@ static const int g_biome_para_range_215_diff[][13] = {
 {pale_garden             , -1500, 2000,  3000, IMAX,   300, IMAX, -7799,  500,  IMIN, IMAX,  IMIN, IMAX},
 {-1,0,0,0,0,0,0,0,0,0,0,0,0}};
 
+static const int g_biome_para_range_262_diff[][13] = {
+{sulfur_caves            ,  IMIN, IMAX,  IMIN, IMAX,  IMIN, IMAX,  IMIN, IMAX,  2000, 9000,  IMIN,-9500},
+{-1,0,0,0,0,0,0,0,0,0,0,0,0}};
+
+static const int g_biome_para_range_263_diff[][13] = {
+{dappled_forest          ,  -4500,-1500, IMIN,-3500, -1900, IMAX,  IMIN, IMAX,  IMIN, IMAX,  -500, IMAX},
+{-1,0,0,0,0,0,0,0,0,0,0,0,0}};
+
 /**
  * Gets the min/max parameter values within which a biome change can occur.
  */
@@ -5580,6 +5596,7 @@ const int *getBiomeParaExtremes(int mc)
             0, 10000,
             0,0, 0,0, 0,0, 0,0,
         };
+
         return extremes_beta;
     }
     if (mc <= MC_1_17)
@@ -5605,6 +5622,22 @@ const int *getBiomeParaLimits(int mc, int id)
     if (mc <= MC_1_17)
         return NULL;
     int i;
+    if (mc > MC_26_2)
+    {
+        for (i = 0; g_biome_para_range_263_diff[i][0] != -1; i++)
+        {
+            if (g_biome_para_range_263_diff[i][0] == id)
+                return &g_biome_para_range_263_diff[i][1];
+        }
+    }
+    if (mc > MC_26_1)
+    {
+        for (i = 0; g_biome_para_range_262_diff[i][0] != -1; i++)
+        {
+            if (g_biome_para_range_262_diff[i][0] == id)
+                return &g_biome_para_range_262_diff[i][1];
+        }
+    }
     if (mc > MC_1_21_WD)
     {
         for (i = 0; g_biome_para_range_215_diff[i][0] != -1; i++)

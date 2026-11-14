@@ -19,16 +19,17 @@ The detailed guides are maintained in Simplified Chinese.
 ## Capabilities
 
 - Package ID: `RZeroF1.Minecraft.SeedMap`
-- Source version: `0.2.2`
+- Source version: `0.3.0` (local, unpublished changes)
 - Target framework: `.NET 10`
 - Native runtime: Windows `win-x64`
-- Minecraft Java public release catalog: 86 entries: 43 historical releases from `1.4.2` through `1.12.2`, plus the existing 43 entries from `1.13.2` through `1.21.11`; exact Native IDs for `1.2.5`, `1.3.1`, and `1.3.2` remain available to internal regression tooling; see the [version matrix](docs/versions.md)
-- Exact-JAR verification: the 86 public releases and the three internally retained releases from 1.2.5 through 1.3.2 have independent game-JAR Oracle records. Biomes, dimensions, strongholds, mineshafts, and registered structure candidate stages for 1.13.2–1.17.1 are Supported; full structure block generation remains outside the support boundary.
+- Minecraft Java public release catalog: 89 entries: 43 historical releases from `1.4.2` through `1.12.2`, the 43 entries from `1.13.2` through `1.21.11`, and `26.1`, `26.2`, `26.3`; exact Native IDs for `1.2.5`, `1.3.1`, and `1.3.2` remain available to internal regression tooling; see the [version matrix](docs/versions.md)
+- Exact-JAR verification: all 89 public releases and the three internally retained releases have independent game-JAR Oracle records. Capabilities are registered separately for each release, structure, and stage; FullGeneration remains Unsupported.
 - Modern version status: Biomes for 1.18–1.21.11 are Supported after 234,864 ordered exact-JAR samples per release, with zero mismatches across all 27 releases. Village, Woodland Mansion, Ruined Portal, and Trail Ruins now use their actual projected height and three-dimensional biome predicate; their candidate, generation-point, and related base-terrain stages are Supported. Desert Pyramid and Jungle Temple retain an approximate additional terrain check.
-- Terrain heights: Exact `WORLD_SURFACE_WG` and `OCEAN_FLOOR_WG` base-height queries for the default, unblended Overworld in all 27 registered releases from 1.18 through 1.21.11. Results use vanilla `getBaseHeight` first-free-Y semantics; post-carving and decorated chunk heightmaps are outside this API.
+- Java 26.x: independent Native release IDs, biome sampling in all three dimensions, `sulfur_caves` in 26.2, and `dappled_forest` with the original 19-order RTree topology and tie behavior in 26.3. Village and Overworld Portal queries use weighted StructureSet selection and retry; 26.3 adds generation points for all 18 Abandoned Camp variants.
+- Terrain heights: Exact `WORLD_SURFACE_WG` and `OCEAN_FLOOR_WG` queries for the default, unblended Overworld in 1.18–1.21.11 and 26.1–26.3. Each 26.x release has its own profile, including 26.3 float density and volume interpolation. Results use vanilla `getBaseHeight` first-free-Y semantics; post-carving and decorated chunk heightmaps are outside this API.
 - Dimensions: Overworld `0`, Nether `-1`, End `1`
 - Sampling steps: `1`, `4`, `16`, `64`, `256` blocks
-- Cubiomes revision: base `e61f90580cbdd883214a8054670dacae655e59c0` with PR #162 changes at `ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2` and local `legacy46.1+modern43.3+terrain27.1` adaptations
+- Cubiomes revision: base `e61f90580cbdd883214a8054670dacae655e59c0` with PR #162 changes at `ca9fcb4e2b4f29a88b15a19fe1f00a73bf503ec2` and local `legacy46.1+modern43.3+terrain27.1+java26.1` adaptations; selectively ported sources are documented in the source manifest
 
 ```text
 Host UI / image framework
@@ -46,7 +47,7 @@ Pinned Cubiomes revision
 
 ## Installation
 
-Add the package to a .NET 10 project and explicitly target Windows x64:
+For the locally built, unpublished `0.3.0` package, add this reference to a .NET 10 project and explicitly target Windows x64:
 
 ```xml
 <PropertyGroup>
@@ -55,7 +56,7 @@ Add the package to a .NET 10 project and explicitly target Windows x64:
 </PropertyGroup>
 
 <ItemGroup>
-  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.2.2" />
+  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.3.0" />
 </ItemGroup>
 ```
 
@@ -101,7 +102,7 @@ Results are row-major. Origins need not align to the positive block step. Each g
 
 ## Supported scope
 
-The package includes Windows x64 native assets and targets vanilla Minecraft Java world computation. Structure results use Cubiomes placement predictions and viability checks. Custom world generation, Minecraft Bedrock, worlds containing regions from different game versions, and full block-world generation are outside the supported scope.
+The package includes Windows x64 native assets and targets vanilla Minecraft Java world computation. Structure results use placement predictions and separately registered viability stages. Java 26.x Nether Portal provides placement candidates; its BiomePredicate and GenerationPoint stages are Unsupported. Custom world generation, Minecraft Bedrock, worlds containing regions from different game versions, and full block-world generation are outside the supported scope.
 
 ## Build and package
 

@@ -7,7 +7,7 @@
 | 项目 | 内容 |
 |---|---|
 | 包 ID | `RZeroF1.Minecraft.SeedMap` |
-| 当前源码版本 | `0.2.2`（本地未发布修改） |
+| 当前源码版本 | `0.3.0`（本地未发布修改） |
 | 目标框架 | `net10.0` |
 | 原生运行时 | `win-x64` |
 | 项目许可证 | MPL-2.0 |
@@ -18,7 +18,7 @@ NuGet 包的已发布版本以 [nuget.org](https://www.nuget.org/packages/RZeroF
 
 ## 安装
 
-消费端使用 .NET 10 和 Windows x64，并固定包版本：
+当前源码构建的本地包使用版本 `0.3.0`；消费端使用 .NET 10 和 Windows x64，并固定包版本：
 
 ```xml
 <PropertyGroup>
@@ -27,7 +27,7 @@ NuGet 包的已发布版本以 [nuget.org](https://www.nuget.org/packages/RZeroF
 </PropertyGroup>
 
 <ItemGroup>
-  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.2.2" />
+  <PackageReference Include="RZeroF1.Minecraft.SeedMap" Version="0.3.0" />
 </ItemGroup>
 ```
 
@@ -71,11 +71,13 @@ dotnet pack src/RZeroF1.Minecraft.SeedMap.Core/RZeroF1.Minecraft.SeedMap.Core.cs
 
 包输出到 `artifacts/packages/`。构建过程调用本地 Native 构建脚本，使用固定的 Cubiomes 源码；指定 `win-x86`、`win-arm64` 或其他运行时会失败。
 
-当前公开源码包含 86 个发行版本条目：43 个现代发行版和 43 个公开历史发行版。1.2.5、1.3.1、1.3.2 的 Native ID 与回归实现保留在源码和本地研究环境中，不进入 `Api.Versions` 的公开目录。逐版状态见 [版本矩阵](versions.md)。原版 JAR、Mapping、Oracle 与实验数据不进入包；消费端运行无需 Java。
+`global.json` 固定 .NET 10 SDK major，并允许使用已安装的更新 feature band；安装更高 major 的 SDK 不会改变本项目的构建工具选择。CI 使用同一约定。
+
+当前公开源码包含 89 个发行版本条目：43 个现代发行版、43 个公开历史发行版及 26.1、26.2、26.3。1.2.5、1.3.1、1.3.2 的 Native ID 与回归实现保留在源码和本地研究环境中，不进入 `Api.Versions` 的公开目录。逐版状态见 [版本矩阵](versions.md)。原版 JAR、Mapping、Oracle 与实验数据不进入包；消费端运行无需 Java。
 
 版本能力由包内 `Api.VersionCapabilities` 返回。实验性 Profile 会随 Native 资产编译，消费端应按各功能的能力状态和已记录限制决定是否启用。
 
-默认主世界的精确基础高度通过 `Api.GetTerrainCapability` 查询。1.18–1.21.11 的 WORLD_SURFACE_WG 和 OCEAN_FLOOR_WG 数学 Profile 随 Native DLL 编译，消费端运行不需要 Java、游戏 JAR 或额外配置文件；后期区块 Heightmap 不属于这些基础高度能力。单点、区域查询与取消示例见 [API 说明](api.md)。
+默认主世界的精确基础高度通过 `Api.GetTerrainCapability` 查询。1.18–1.21.11 及 26.1–26.3 的 WORLD_SURFACE_WG 和 OCEAN_FLOOR_WG 数学 Profile 随 Native DLL 编译，消费端运行不需要 Java、游戏 JAR 或额外配置文件；后期区块 Heightmap 不属于这些基础高度能力。单点、区域查询与取消示例见 [API 说明](api.md)。
 
 ## 包内容检查
 
@@ -85,7 +87,7 @@ dotnet pack src/RZeroF1.Minecraft.SeedMap.Core/RZeroF1.Minecraft.SeedMap.Core.cs
 ./scripts/Test-ArtifactIsolation.ps1 -CheckTracked -PackageDirectory artifacts/packages -OutputDirectory src/RZeroF1.Minecraft.SeedMap.Core/bin/Release/net10.0/win-x64
 ```
 
-目录输入会读取当前 SDK 项目中的 `PackageVersion`，只检查本次版本对应的 `.nupkg` 和 `.snupkg`；不会枚举历史包。也可以直接传入单个当前包，例如 `-PackagePath artifacts/packages/RZeroF1.Minecraft.SeedMap.0.2.2.nupkg`。需要检查其他版本时显式传入 `-PackageVersion`。
+目录输入会读取当前 SDK 项目中的 `PackageVersion`，只检查本次版本对应的 `.nupkg` 和 `.snupkg`；不会枚举历史包。也可以直接传入单个当前包，例如 `-PackagePath artifacts/packages/RZeroF1.Minecraft.SeedMap.0.3.0.nupkg`。需要检查其他版本时显式传入 `-PackageVersion`。
 
 独立消费验证应在单独的 .NET 10 Windows x64 项目中通过 `PackageReference` 还原实际 `.nupkg`，核对版本能力、Native 修订号和实际加载路径。重复打包同一版本进行本地开发验证时，应换用新的包缓存目录；准备发布的产物从最终提交重新构建。
 
